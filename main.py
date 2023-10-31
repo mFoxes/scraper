@@ -12,6 +12,11 @@ url = None
 initialUrl = ""
 bookId = ""
 
+viewedUrl = []
+
+indexList = []
+indexNum = 0
+
 finalString = []
 
 ua = dict(DesiredCapabilities.CHROME)
@@ -30,19 +35,72 @@ def getHtml(finUrl):
 
     return browser.page_source
 
+def savePage(sectionTitle, pageHtml):
+    global indexNum
+    if len([i for i in finalString if sectionTitle.text in i]) == 0:
+        indexList.append(sectionTitle.text)
+        finalString.append(f'<div id="index-{indexNum}">{sectionTitle}</div>')
+
+        indexNum += 1
+
+    subTitle = pageHtml.find('h2')
+    if subTitle != None:
+        indexList.append(subTitle.text)
+        subTitle['id'] = f'index-{indexNum}'
+        indexNum += 1
+
+    finalString.append(pageHtml)
+
+def resetGlobalVariable():
+    global indexList
+    global finalString
+    global indexNum
+    global url
+    global viewedUrl
+
+    indexNum = 0
+    url = None
+    indexList = []
+    finalString = []
+    viewedUrl = []
+
+def writeFile():
+    global initialUrl
+    global indexList
+    global finalString
+    with open(f'{bookId}.html', 'wb') as f:
+        f.write("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body>".encode('utf-8'))
+        f.write(f'<div><a href="{initialUrl}">Ссылка на книгу</a></div>'.encode('utf-8'))
+        f.write(f'<h2>Оглавление</h2>'.encode('utf-8'))
+        for idx, line in enumerate(indexList):
+            f.write(f'<div><a href="#index-{idx}">{line}</a></div>'.encode('utf-8'))
+
+        for line in finalString:
+            f.write(line.encode('utf-8'))
+        f.write("</body></html>".encode('utf-8'))
+
+def getNextUrl(url):
+    idString = url.split('/')[-1].split('.')[0]
+    newId = int(idString) + 1
+
+    newIdString = ''
+    for _ in range(len(idString) - len(str(newId))):
+        newIdString += '0'
+    newIdString += str(newId)
+
+    newUrl = f'{url.split(idString)[0]}{newIdString}.{url.split("/")[-1].split(".")[1]}'
+
+    return newUrl
+
 def getTextRosmedlib():
     global url
-    clr()
-    print(f'Загрузка...')
     res = getHtml(url)
     soup = BeautifulSoup(res, 'lxml')
 
     sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1')
     pageHtml = soup.find('div', class_='wrap-content-read')
 
-    if not(sectionTitle in finalString):
-        finalString.append(sectionTitle)
-    finalString.append(pageHtml)
+    savePage(sectionTitle, pageHtml)
 
     if soup.find('a', class_='bmark-tab') != None:
         soup.find('a', class_='bmark-tab').decompose()
@@ -50,53 +108,70 @@ def getTextRosmedlib():
     nextBtn = soup.find('div', class_='arrow-right-tab').find('a')
     if nextBtn != None:
         url = nextBtn['href']
+        viewedUrl.append(url)
     else:
         url = '-1'
+
+def rosmedlibLogin():
+    browser.find_element(By.ID, 'user_account').send_keys(loginAndPass)
+    time.sleep(1)
+    browser.find_element(By.ID, 'check_account').click()
+    time.sleep(1)
+    browser.find_element(By.ID, 'user_password').send_keys(loginAndPass)
+    time.sleep(1)
+    browser.find_element(By.ID, 'entry').click()
+    time.sleep(1)
 
 def rosmedlibInit():
     global browser
     global url
+    global finalString
+    global indexNum
+    global initialUrl
+    global viewedUrl
     try:
+        clr()
+        print('Текущий сайт: ', initialUrl)
+        print('Текущий id: ', bookId)
+        print(f'Загрузка...')
+
+        resetGlobalVariable()
+
         browser = webdriver.Chrome(options)
         browser.get(initialUrl)
 
         browser.find_element(By.ID, 'guest_login_frame').find_element(By.TAG_NAME, 'a').click()
         time.sleep(1)
-        browser.find_element(By.ID, 'user_account').send_keys(loginAndPass)
-        time.sleep(1)
-        browser.find_element(By.ID, 'check_account').click()
-        time.sleep(1)
-        browser.find_element(By.ID, 'user_password').send_keys(loginAndPass)
-        time.sleep(1)
-        browser.find_element(By.ID, 'entry').click()
-        time.sleep(1)
+        rosmedlibLogin()
         browser.find_element(By.ID, 'a-to_first_chapter').click()
         time.sleep(1)
 
         while url != '-1':
             getTextRosmedlib()
 
-    except Exception as _ex:
-        print(_ex)
-    # finally:
-    #     browser.close()
-    #     browser.quit()
+        clr()
+        print('Запись')
 
-    with open(f'{bookId}.html', 'wb') as f:
-        f.write("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body>".encode('utf-8'))
-        for line in finalString:
-            f.write(line.encode('utf-8'))
-        f.write("</body></html>".encode('utf-8'))
+    except Exception as _ex:
+        print('Ошибка: ', url)
+        print(_ex)
+    finally:
+        browser.close()
+        browser.quit()
+
+    writeFile()
+
+    clr()
+    print('Загрузка завершена')
 
 
 def getTextStudentlibrary():
     global browser
     global url
-    clr()
-    print(f'Загрузка...')
+    global indexNum
+
     pageHtml = getHtml(url)
     soup = BeautifulSoup(pageHtml, 'lxml')
-
     content = soup.find('div', class_="r_main-content")
 
     sectionTitle = content.find('h1')
@@ -105,25 +180,41 @@ def getTextStudentlibrary():
     if content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab') != None:
         content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab').decompose()
 
-    while len(pageHtml.find_all('div', class_='hs317')) > 0:
-        browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        pageHtml = content.find('div', class_='r_main-content_content')
-
-    if not(sectionTitle in finalString):
-        finalString.append(sectionTitle)
-    finalString.append(pageHtml)
+    savePage(sectionTitle, pageHtml)
 
     nextBtn = soup.find('div', class_='_to_next-page')
-    if nextBtn != None:
-        print('url: ', url)
-        url = nextBtn.find('a')['href']
+    if nextBtn != None and nextBtn.find('a') != None:
+        if nextBtn.find('a')['href'] in viewedUrl:
+            url = getNextUrl(url)
+        else:
+            url = nextBtn.find('a')['href']
+
+        viewedUrl.append(url)
     else:
         url = '-1'
+
+def studentlibraryLogin():
+    browser.find_element(By.ID, 'new_UName').send_keys(loginAndPass)
+    time.sleep(1)
+
+    browser.find_element(By.ID, 'new_PWord').send_keys(loginAndPass)
+    time.sleep(1)
+
+    browser.find_element(By.ID, 'try_UNamePWord').click()
+    time.sleep(1)
 
 def studentlibraryInit():
     global browser
     global url
+    global initialUrl
     try:
+        clr()
+        print('Текущий сайт: ', initialUrl)
+        print('Текущий id: ', bookId)
+        print(f'Загрузка...')
+
+        resetGlobalVariable()
+
         browser = webdriver.Chrome(options)
 
         browser.get(initialUrl)
@@ -132,14 +223,7 @@ def studentlibraryInit():
         browser.find_element(By.ID, 'guest_login_frame').find_element(By.TAG_NAME, 'a').click()
         time.sleep(1)
 
-        browser.find_element(By.ID, 'new_UName').send_keys(loginAndPass)
-        time.sleep(1)
-
-        browser.find_element(By.ID, 'new_PWord').send_keys(loginAndPass)
-        time.sleep(1)
-
-        browser.find_element(By.ID, 'try_UNamePWord').click()
-        time.sleep(1)
+        studentlibraryLogin()
 
         browser.find_element(By.ID, 'a-to_first_chapter').click()
         time.sleep(1)
@@ -148,47 +232,38 @@ def studentlibraryInit():
         while url != '-1':
             getTextStudentlibrary()
 
-    except Exception as _ex:
-        print(_ex)
-    # finally:
-        # browser.close()
-        # browser.quit()
+        clr()
+        print('Запись')
 
-    with open(f'{bookId}.html', 'wb') as f:
-        f.write("<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body>".encode('utf-8'))
-        for line in finalString:
-            f.write(line.encode('utf-8'))
-        f.write("</body></html>".encode('utf-8'))
+    except Exception as _ex:
+        print('Ошибка: ', url)
+        print(_ex)
+    finally:
+        browser.close()
+        browser.quit()
+
+    writeFile()
+
+    clr()
+    print('Загрузка завершена')
+
 
 if __name__ == '__main__':
-    inp = -1
-    while inp != 0:
-        clr()
+    while True:
         if initialUrl != '':
             print('Текущий сайт: ', initialUrl)
             print('Текущий id: ', bookId)
         else:
-            print('Введие url')
-        print('----------------------------')
-        print('1 - Вставить новый url')
-        if initialUrl != '':
-            print('2 - Старт')
-        print('0 - Выход')
-        print('----------------------------')
-        inp = int(input("Введите действие: "))
+            print('Введите url')
 
-        if inp == 1:
-            clr()
-            print('Текущий сайт: ', initialUrl)
-            initialUrl = input('Введите новый url: ')
-            bookId = initialUrl.split('/')[-1].split('.')[0]
-        elif inp == 2 and initialUrl != '':
+        initialUrl = input('Введите новый url: ')
+        if '?SSr' in initialUrl:
+            initialUrl = initialUrl.split('?')[0]
+        bookId = initialUrl.split('/')[-1].split('.')[0]
+        if initialUrl != '':
             clr()
             if 'www.rosmedlib.ru' in initialUrl:
                 rosmedlibInit()
             elif 'www.studentlibrary.ru' in initialUrl:
                 studentlibraryInit()
-            break
-        elif inp == 0:
-            break
 
