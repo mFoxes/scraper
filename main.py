@@ -4,6 +4,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 import time
 import os
+import re
 
 loginAndPass = '0403819'
 
@@ -100,6 +101,20 @@ def getTextRosmedlib():
     sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1')
     pageHtml = soup.find('div', class_='wrap-content-read')
 
+    if len(pageHtml.findAll(text=re.compile('tab not found'))) > 0:
+        browser.get(viewedUrl[-2])
+        print("ЭТОТ САЙТ СДЕЛАЛИ ЕБАНЫЕ АУТИСТЫ, ВВЕДИТЕ ССЫЛКУ НА СЛЕДУЮЩУЮ СТРАНИЦУ")
+        print("Последний заголовок: ", indexList[-1])
+        tempUrl = input('Новый url: ')
+
+        url = f'{tempUrl.split("?")[0]}?{url.split("?")[1]}'
+
+        res = getHtml(url)
+        soup = BeautifulSoup(res, 'lxml')
+
+        sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1')
+        pageHtml = soup.find('div', class_='wrap-content-read')
+
     savePage(sectionTitle, pageHtml)
 
     if soup.find('a', class_='bmark-tab') != None:
@@ -176,6 +191,21 @@ def getTextStudentlibrary():
 
     sectionTitle = content.find('h1')
     pageHtml = content.find('div', class_='r_main-content_content')
+
+    if len(pageHtml.findAll(text=re.compile('tab not found'))) > 0:
+        browser.get(viewedUrl[-2])
+        print("ЭТОТ САЙТ СДЕЛАЛИ ЕБАНЫЕ АУТИСТЫ, ВВЕДИТЕ ССЫЛКУ НА СЛЕДУЮЩУЮ СТРАНИЦУ")
+        print("Последний заголовок: ", indexList[-1])
+        tempUrl = input('Новый url: ')
+
+        url = f'{tempUrl.split("?")[0]}?{url.split("?")[1]}'
+
+        pageHtml = getHtml(url)
+        soup = BeautifulSoup(pageHtml, 'lxml')
+        content = soup.find('div', class_="r_main-content")
+
+        sectionTitle = content.find('h1')
+        pageHtml = content.find('div', class_='r_main-content_content')
 
     if content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab') != None:
         content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab').decompose()
