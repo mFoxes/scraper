@@ -30,23 +30,25 @@ def clr():
     os.system(['clear', 'cls'][os.name == 'nt'])
 
 def getHtml(finUrl):
+    global url
     if finUrl != None:
         browser.get(finUrl)
         # time.sleep(1)
-
+    else:
+        url = browser.current_url
     return browser.page_source
 
 def savePage(sectionTitle, pageHtml):
     global indexNum
-    if len([i for i in finalString if sectionTitle.text in i]) == 0:
-        indexList.append(sectionTitle.text)
-        finalString.append(f'<div id="index-{indexNum}">{sectionTitle}</div>')
+    if len([i for i in finalString if sectionTitle.get_text(separator=" ")in i]) == 0:
+        indexList.append(sectionTitle.get_text(separator=" "))
+        finalString.append(f'<div id="index-{indexNum}"><h1>{sectionTitle.get_text(separator=" ")}</h1></div>')
 
         indexNum += 1
 
     subTitle = pageHtml.find('h2')
     if subTitle != None:
-        indexList.append(subTitle.text)
+        indexList.append(subTitle.get_text(separator=" "))
         subTitle['id'] = f'index-{indexNum}'
         indexNum += 1
 
@@ -98,13 +100,15 @@ def getTextRosmedlib():
     res = getHtml(url)
     soup = BeautifulSoup(res, 'lxml')
 
-    sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1')
+    sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1', recursive=True)
     pageHtml = soup.find('div', class_='wrap-content-read')
 
-    if len(pageHtml.findAll(text=re.compile('tab not found'))) > 0:
-        browser.get(viewedUrl[-2])
+    if len(soup.findAll(string=re.compile('tab not found'))) > 0:
+        if len(viewedUrl) > 2:
+            browser.get(viewedUrl[-2])
         print("ЭТОТ САЙТ СДЕЛАЛИ ЕБАНЫЕ АУТИСТЫ, ВВЕДИТЕ ССЫЛКУ НА СЛЕДУЮЩУЮ СТРАНИЦУ")
-        print("Последний заголовок: ", indexList[-1])
+        if len(indexList) > 1:
+            print("Последний заголовок: ", indexList[-1])
         tempUrl = input('Новый url: ')
 
         url = f'{tempUrl.split("?")[0]}?{url.split("?")[1]}'
@@ -114,6 +118,7 @@ def getTextRosmedlib():
 
         sectionTitle = soup.find('div', class_='wrap-quantity-title').find('h1')
         pageHtml = soup.find('div', class_='wrap-content-read')
+
 
     savePage(sectionTitle, pageHtml)
 
@@ -179,23 +184,26 @@ def rosmedlibInit():
     clr()
     print('Загрузка завершена')
 
-
 def getTextStudentlibrary():
     global browser
     global url
     global indexNum
 
     pageHtml = getHtml(url)
-    soup = BeautifulSoup(pageHtml, 'lxml')
+    # lxml
+    soup = BeautifulSoup(pageHtml, 'html.parser')
     content = soup.find('div', class_="r_main-content")
 
-    sectionTitle = content.find('h1')
-    pageHtml = content.find('div', class_='r_main-content_content')
+    if content != None:
+        sectionTitle = content.find('h1', recursive=True)
+        pageHtml = content.find('div', class_='r_main-content_content')
 
-    if len(pageHtml.findAll(text=re.compile('tab not found'))) > 0:
-        browser.get(viewedUrl[-2])
+    if len(soup.findAll(string=re.compile('tab not found'))) > 0 or len(soup.findAll('div', id='main_content_404')) > 0:
+        if len(viewedUrl) > 2:
+            browser.get(viewedUrl[-2])
         print("ЭТОТ САЙТ СДЕЛАЛИ ЕБАНЫЕ АУТИСТЫ, ВВЕДИТЕ ССЫЛКУ НА СЛЕДУЮЩУЮ СТРАНИЦУ")
-        print("Последний заголовок: ", indexList[-1])
+        if len(indexList) > 1:
+            print("Последний заголовок: ", indexList[-1])
         tempUrl = input('Новый url: ')
 
         url = f'{tempUrl.split("?")[0]}?{url.split("?")[1]}'
@@ -206,6 +214,7 @@ def getTextStudentlibrary():
 
         sectionTitle = content.find('h1')
         pageHtml = content.find('div', class_='r_main-content_content')
+
 
     if content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab') != None:
         content.find('div', class_='r_main-content_content').find('a', class_='bmark-tab').decompose()
