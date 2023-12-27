@@ -26,6 +26,7 @@ options = webdriver.ChromeOptions()
 # options.add_argument('window-size=1920x935')
 browser = None
 
+# Utils
 def clr():
     os.system(['clear', 'cls'][os.name == 'nt'])
 
@@ -95,6 +96,8 @@ def getNextUrl(url):
 
     return newUrl
 
+
+# Rosmedlib
 def getTextRosmedlib():
     global url
     res = getHtml(url)
@@ -184,6 +187,8 @@ def rosmedlibInit():
     clr()
     print('Загрузка завершена')
 
+
+# Studentlibrary
 def getTextStudentlibrary():
     global browser
     global url
@@ -287,6 +292,84 @@ def studentlibraryInit():
     print('Загрузка завершена')
 
 
+# speclit.profy-lib.ru
+def downloadSpeclitProfylibSvg():
+    global browser
+    global url
+    global indexNum
+
+    # while True:
+    pageHtml = browser.get(url).page_source
+    print('te')
+    soup = BeautifulSoup(pageHtml, 'html.parser')
+    print('te')
+    content = soup.find('div', id_="mainTextSelection")
+    print('te')
+    print('content: ', content)
+    print('te')
+    downloaded_files = 0
+    with open(f'../temp/{downloaded_files}.svg', 'wb') as f:
+        f.write(content)
+        downloaded_files += 1
+
+    browser.find_element(By.CLASS_NAME, 'iceCmdLnk  command forwardCommand').click()
+
+
+def speclitProfylibLogin():
+    browser.find_element(By.ID, '_58_login').send_keys('arefyev02@gmail.com')
+    time.sleep(1)
+    print('te')
+
+    browser.find_element(By.ID, '_58_password').send_keys('Yej53yGWsecHD8p')
+    time.sleep(1)
+    print('te')
+    btn = browser.find_element(By.CLASS_NAME, 'aui-button-input-submit')
+    print(btn)
+    btn.click()
+
+    time.sleep(1)
+
+def speclitProfylibInit():
+    global browser
+    global url
+    global initialUrl
+    try:
+        clr()
+        print('Текущий сайт: ', initialUrl)
+        print('Текущий id: ', bookId)
+        print(f'Загрузка...')
+
+        resetGlobalVariable()
+
+        browser = webdriver.Chrome(options)
+
+        browser.get(initialUrl)
+
+        time.sleep(1)
+        browser.find_element(By.CLASS_NAME, 'sign-in').click()
+        time.sleep(1)
+
+        speclitProfylibLogin()
+
+        downloadSpeclitProfylibSvg()
+
+        # clr()
+        print('Запись')
+
+    except Exception as _ex:
+        print('Ошибка: ', url)
+        print(_ex)
+    # finally:
+        # browser.close()
+        # browser.quit()
+
+    # writeFile()
+
+    # clr()
+    print('Загрузка завершена')
+    pass
+
+
 if __name__ == '__main__':
     while True:
         if initialUrl != '':
@@ -305,4 +388,6 @@ if __name__ == '__main__':
                 rosmedlibInit()
             elif 'www.studentlibrary.ru' in initialUrl:
                 studentlibraryInit()
+            elif 'speclit.profy-lib.ru' in initialUrl:
+                speclitProfylibInit()
 
