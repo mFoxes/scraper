@@ -1,10 +1,14 @@
 from bs4 import BeautifulSoup
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 import time
 import os
 import re
+import shutil
+import urllib.parse
+import json
 
 loginAndPass = '0403819'
 
@@ -25,6 +29,8 @@ options = webdriver.ChromeOptions()
 # options.add_argument('headless')
 # options.add_argument('window-size=1920x935')
 browser = None
+
+temp = 0
 
 # Utils
 def clr():
@@ -293,65 +299,54 @@ def studentlibraryInit():
 
 
 # speclit.profy-lib.ru
-def downloadSpeclitProfylibSvg():
-    global browser
-    global url
-    global indexNum
+def downloadSpeclitProfylibImg():
+    global initialUrl
+    cookies = json.load(open('../cookies.json'))
+    headers = json.load(open('../headers.json'))
 
-    # while True:
-    pageHtml = browser.get(url).page_source
-    print('te')
-    soup = BeautifulSoup(pageHtml, 'html.parser')
-    print('te')
-    content = soup.find('div', id_="mainTextSelection")
-    print('te')
-    print('content: ', content)
-    print('te')
-    downloaded_files = 0
-    with open(f'../temp/{downloaded_files}.svg', 'wb') as f:
-        f.write(content)
-        downloaded_files += 1
+    cookiesString = ""
+    for i in cookies:
+        cookiesString += f'{i}={cookies[i]}; '
+    headers['Cookie'] = cookiesString
+    print('headers', headers)
+    
+    body = json.load(open('../body.json'))
+    body['A9912%3Aj_idt11%3Aj_idt23'] = str(int(body['A9912%3Aj_idt11%3Aj_idt23']) + 1)
+    body['javax.faces.encodedURL'] = initialUrl
+    # for i in range(10):
+    content = requests.post(initialUrl, headers=headers, json=body).content.decode('utf-8')
 
-    browser.find_element(By.CLASS_NAME, 'iceCmdLnk  command forwardCommand').click()
+    reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", content)
+    nextName = reg.group(1)
+    nexLayout = reg.group(2)
+    imgUrl = "https://speclit.profy-lib.ru/pdf-viewer-portlet/pdfRenderer/?documentId=" + urllib.parse.quote(nextName) + "?layout=" + urllib.parse.quote(nexLayout)
+    print('imgUrl', imgUrl)
+
+    headers['Accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+    del headers['Content-type']
+    headers['Sec-Fetch-Dest'] = 'image'
+    headers['Sec-Fetch-Mode'] = 'no-cors'
+
+    res = requests.get(imgUrl, headers=headers, stream=True)
+    print(res.content)
+    if res.status_code == 200:
+        with open(f'temp/{nextName}.jpg', 'wb') as f:
+            f.write(res.content)
+    else:
+        print('Image Couldn\'t be retrieved')
 
 
-def speclitProfylibLogin():
-    browser.find_element(By.ID, '_58_login').send_keys('arefyev02@gmail.com')
-    time.sleep(1)
-    print('te')
+    print(nextName)
 
-    browser.find_element(By.ID, '_58_password').send_keys('Yej53yGWsecHD8p')
-    time.sleep(1)
-    print('te')
-    btn = browser.find_element(By.CLASS_NAME, 'aui-button-input-submit')
-    print(btn)
-    btn.click()
 
-    time.sleep(1)
 
 def speclitProfylibInit():
-    global browser
-    global url
     global initialUrl
     try:
         clr()
-        print('Текущий сайт: ', initialUrl)
-        print('Текущий id: ', bookId)
         print(f'Загрузка...')
 
-        resetGlobalVariable()
-
-        browser = webdriver.Chrome(options)
-
-        browser.get(initialUrl)
-
-        time.sleep(1)
-        browser.find_element(By.CLASS_NAME, 'sign-in').click()
-        time.sleep(1)
-
-        speclitProfylibLogin()
-
-        downloadSpeclitProfylibSvg()
+        downloadSpeclitProfylibImg()
 
         # clr()
         print('Запись')
@@ -359,11 +354,8 @@ def speclitProfylibInit():
     except Exception as _ex:
         print('Ошибка: ', url)
         print(_ex)
-    # finally:
-        # browser.close()
-        # browser.quit()
 
-    # writeFile()
+    initialUrl = ""
 
     # clr()
     print('Загрузка завершена')

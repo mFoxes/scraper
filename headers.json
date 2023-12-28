@@ -1,0 +1,16 @@
+{
+	"Accept": "*/*",
+	"Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,af;q=0.6",
+	"Connection": "keep-alive",
+	"Content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+	"Faces-Request": "partial/ajax",
+	"Origin": "https://speclit.profy-lib.ru",
+	"Referer": "https://speclit.profy-lib.ru/book/-/pdf/64218?p_p_auth=nD4XmPeK&_pdfviewerportlet_WAR_pdfviewerportlet_hashCode=26ac1e1c-b61d-46b2-a2221702402457595",
+	"Sec-Fetch-Dest": "empty",
+	"Sec-Fetch-Mode": "cors",
+	"Sec-Fetch-Site": "same-origin",
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	"sec-ch-ua": "Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+	"sec-ch-ua-mobile": "?0",
+	"sec-ch-ua-platform": "Windows"
+}
