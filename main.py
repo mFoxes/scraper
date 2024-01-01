@@ -6,7 +6,6 @@ from selenium.webdriver.common.by import By
 import time
 import os
 import re
-import shutil
 import urllib.parse
 import json
 
@@ -31,6 +30,8 @@ options = webdriver.ChromeOptions()
 browser = None
 
 temp = 0
+
+folderName = ''
 
 # Utils
 def clr():
@@ -299,57 +300,102 @@ def studentlibraryInit():
 
 
 # speclit.profy-lib.ru
-def downloadSpeclitProfylibImg():
-    global initialUrl
-    cookies = json.load(open('../cookies.json'))
-    headers = json.load(open('../headers.json'))
-
+def getMaxPageNumber():
+    global folderName
+    body = json.load(open('body.json'))
+    cookies = json.load(open('cookies.json'))
+    headers = json.load(open('headers.json'))
+    params = json.load(open('query.json'))
     cookiesString = ""
     for i in cookies:
         cookiesString += f'{i}={cookies[i]}; '
     headers['Cookie'] = cookiesString
-    print('headers', headers)
+    headers['Referer'] = initialUrl
     
-    body = json.load(open('../body.json'))
-    body['A9912%3Aj_idt11%3Aj_idt23'] = str(int(body['A9912%3Aj_idt11%3Aj_idt23']) + 1)
+    body['A9912:j_idt11:j_idt23'] = str(int(body['A9912:j_idt11:j_idt23']) + 1)
     body['javax.faces.encodedURL'] = initialUrl
-    # for i in range(10):
-    content = requests.post(initialUrl, headers=headers, json=body).content.decode('utf-8')
+    urlParamsString = ""
+    for i in params:
+        urlParamsString += f'&{i}={urllib.parse.quote(params[i], safe="")}'
 
-    reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", content)
-    nextName = reg.group(1)
-    nexLayout = reg.group(2)
-    imgUrl = "https://speclit.profy-lib.ru/pdf-viewer-portlet/pdfRenderer/?documentId=" + urllib.parse.quote(nextName) + "?layout=" + urllib.parse.quote(nexLayout)
-    print('imgUrl', imgUrl)
+    url = 'https://speclit.profy-lib.ru/book?' + urlParamsString[1::]
+    body['javax.faces.encodedURL'] = urllib.parse.quote(url, safe='()&?=')
+    bodyRow = ''
+    for i in body:
+        bodyRow += f'&{urllib.parse.quote(i, safe="()&?=")}={urllib.parse.quote(body[i], safe="()&?=")}'
+    resp = requests.post(url, headers=headers, data=bodyRow[1::])
 
-    headers['Accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
-    del headers['Content-type']
-    headers['Sec-Fetch-Dest'] = 'image'
-    headers['Sec-Fetch-Mode'] = 'no-cors'
+    reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", resp.text)
+    folderName = reg.group(1)
+    os.mkdir(folderName)  
 
-    res = requests.get(imgUrl, headers=headers, stream=True)
-    print(res.content)
-    if res.status_code == 200:
-        with open(f'temp/{nextName}.jpg', 'wb') as f:
-            f.write(res.content)
-    else:
-        print('Image Couldn\'t be retrieved')
+    return int(re.search(r"из (.*)<\/label>", resp.text).group(1))
 
+def downloadSpeclitProfylibImg():
+    global initialUrl
+    global folderName
+    bookNumber = 0
 
-    print(nextName)
+    nextGuid = ''
 
+    body = json.load(open('body.json'))
+
+    pageCount = getMaxPageNumber() - 2
+    for i in range(pageCount):
+        clr()
+        print(f'Загрузка...')
+        print(i, " из ", pageCount)
+        cookies = json.load(open('cookies.json'))
+        headers = json.load(open('headers.json'))
+        params = json.load(open('query.json'))
+        cookiesString = ""
+        for i in cookies:
+            cookiesString += f'{i}={cookies[i]}; '
+        headers['Cookie'] = cookiesString
+        headers['Referer'] = initialUrl
+        
+        body['A9912:j_idt11:j_idt23'] = str(int(body['A9912:j_idt11:j_idt23']) + 1)
+        body['javax.faces.encodedURL'] = initialUrl
+        urlParamsString = ""
+        for i in params:
+            urlParamsString += f'&{i}={urllib.parse.quote(params[i], safe="")}'
+
+        url = 'https://speclit.profy-lib.ru/book?' + urlParamsString[1::]
+        body['javax.faces.encodedURL'] = urllib.parse.quote(url, safe='()&?=')
+        bodyRow = ''
+        for i in body:
+            bodyRow += f'&{urllib.parse.quote(i, safe="()&?=")}={urllib.parse.quote(body[i], safe="()&?=")}'
+        resp = requests.post(url, headers=headers, data=bodyRow[1::])
+
+        reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", resp.text)
+        nextName = reg.group(1)
+        nexLayout = reg.group(2)
+        imgUrl = "https://speclit.profy-lib.ru/pdf-viewer-portlet/pdfRenderer/?documentId=" + urllib.parse.quote(nextName, safe='()') + "&layout=" + urllib.parse.quote(nexLayout, safe='()')
+
+        cookies['csfcfc'] = nextGuid
+        cookiesString = ""
+        for i in cookies:
+            cookiesString += f'{i}={cookies[i]}; '
+        headers['Cookie'] = cookiesString
+
+        headers['Accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        del headers['Content-type']
+        headers['Sec-Fetch-Dest'] = 'image'
+        headers['Sec-Fetch-Mode'] = 'no-cors'
+
+        res = requests.get(imgUrl, headers=headers, stream=True)
+        nextGuid = re.search(f"csfcfc=(.*);", resp.headers['Set-Cookie']).group(1)
+        if res.status_code == 200:
+            with open(f'{folderName}/{bookNumber}.jpg', 'wb') as f:
+                f.write(res.content)
+                bookNumber += 1
 
 
 def speclitProfylibInit():
     global initialUrl
     try:
-        clr()
-        print(f'Загрузка...')
 
         downloadSpeclitProfylibImg()
-
-        # clr()
-        print('Запись')
 
     except Exception as _ex:
         print('Ошибка: ', url)
@@ -357,7 +403,7 @@ def speclitProfylibInit():
 
     initialUrl = ""
 
-    # clr()
+    clr()
     print('Загрузка завершена')
     pass
 
