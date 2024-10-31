@@ -35,7 +35,8 @@ folderName = ''
 
 # Utils
 def clr():
-    os.system(['clear', 'cls'][os.name == 'nt'])
+    # os.system(['clear', 'cls'][os.name == 'nt'])
+    pass
 
 def getHtml(finUrl):
     global url
@@ -91,17 +92,21 @@ def writeFile():
         f.write("</body></html>".encode('utf-8'))
 
 def getNextUrl(url):
-    idString = url.split('/')[-1].split('.')[0]
-    newId = int(idString) + 1
+    try:
+        idString = url.split('/')[-1].split('.')[0]
+        newId = int(idString) + 1
 
-    newIdString = ''
-    for _ in range(len(idString) - len(str(newId))):
-        newIdString += '0'
-    newIdString += str(newId)
+        newIdString = ''
+        for _ in range(len(idString) - len(str(newId))):
+            newIdString += '0'
+        newIdString += str(newId)
 
-    newUrl = f'{url.split(idString)[0]}{newIdString}.{url.split("/")[-1].split(".")[1]}'
+        newUrl = f'{url.split(idString)[0]}{newIdString}.{url.split("/")[-1].split(".")[1]}'
 
-    return newUrl
+        return newUrl
+    except:
+        return viewedUrl[-2]
+    
 
 
 # Rosmedlib
@@ -185,9 +190,9 @@ def rosmedlibInit():
     except Exception as _ex:
         print('Ошибка: ', url)
         print(_ex)
-    finally:
-        browser.close()
-        browser.quit()
+    # finally:
+        # browser.close()
+        # browser.quit()
 
     writeFile()
 
@@ -279,7 +284,6 @@ def studentlibraryInit():
         browser.find_element(By.ID, 'a-to_first_chapter').click()
         time.sleep(1)
 
-
         while url != '-1':
             getTextStudentlibrary()
 
@@ -289,9 +293,9 @@ def studentlibraryInit():
     except Exception as _ex:
         print('Ошибка: ', url)
         print(_ex)
-    finally:
-        browser.close()
-        browser.quit()
+    # finally:
+        # browser.close()
+        # browser.quit()
 
     writeFile()
 
