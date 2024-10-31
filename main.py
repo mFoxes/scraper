@@ -1,10 +1,13 @@
 from bs4 import BeautifulSoup
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 import time
 import os
 import re
+import urllib.parse
+import json
 
 loginAndPass = '0403819'
 
@@ -26,8 +29,14 @@ options = webdriver.ChromeOptions()
 # options.add_argument('window-size=1920x935')
 browser = None
 
+temp = 0
+
+folderName = ''
+
+# Utils
 def clr():
-    os.system(['clear', 'cls'][os.name == 'nt'])
+    # os.system(['clear', 'cls'][os.name == 'nt'])
+    pass
 
 def getHtml(finUrl):
     global url
@@ -83,18 +92,24 @@ def writeFile():
         f.write("</body></html>".encode('utf-8'))
 
 def getNextUrl(url):
-    idString = url.split('/')[-1].split('.')[0]
-    newId = int(idString) + 1
+    try:
+        idString = url.split('/')[-1].split('.')[0]
+        newId = int(idString) + 1
 
-    newIdString = ''
-    for _ in range(len(idString) - len(str(newId))):
-        newIdString += '0'
-    newIdString += str(newId)
+        newIdString = ''
+        for _ in range(len(idString) - len(str(newId))):
+            newIdString += '0'
+        newIdString += str(newId)
 
-    newUrl = f'{url.split(idString)[0]}{newIdString}.{url.split("/")[-1].split(".")[1]}'
+        newUrl = f'{url.split(idString)[0]}{newIdString}.{url.split("/")[-1].split(".")[1]}'
 
-    return newUrl
+        return newUrl
+    except:
+        return viewedUrl[-2]
+    
 
+
+# Rosmedlib
 def getTextRosmedlib():
     global url
     res = getHtml(url)
@@ -175,15 +190,17 @@ def rosmedlibInit():
     except Exception as _ex:
         print('Ошибка: ', url)
         print(_ex)
-    finally:
-        browser.close()
-        browser.quit()
+    # finally:
+        # browser.close()
+        # browser.quit()
 
     writeFile()
 
     clr()
     print('Загрузка завершена')
 
+
+# Studentlibrary
 def getTextStudentlibrary():
     global browser
     global url
@@ -267,7 +284,6 @@ def studentlibraryInit():
         browser.find_element(By.ID, 'a-to_first_chapter').click()
         time.sleep(1)
 
-
         while url != '-1':
             getTextStudentlibrary()
 
@@ -277,14 +293,123 @@ def studentlibraryInit():
     except Exception as _ex:
         print('Ошибка: ', url)
         print(_ex)
-    finally:
-        browser.close()
-        browser.quit()
+    # finally:
+        # browser.close()
+        # browser.quit()
 
     writeFile()
 
     clr()
     print('Загрузка завершена')
+
+
+# speclit.profy-lib.ru
+def getMaxPageNumber():
+    global folderName
+    body = json.load(open('body.json'))
+    cookies = json.load(open('cookies.json'))
+    headers = json.load(open('headers.json'))
+    params = json.load(open('query.json'))
+    cookiesString = ""
+    for i in cookies:
+        cookiesString += f'{i}={cookies[i]}; '
+    headers['Cookie'] = cookiesString
+    headers['Referer'] = initialUrl
+    
+    body['A9912:j_idt11:j_idt23'] = str(int(body['A9912:j_idt11:j_idt23']) + 1)
+    body['javax.faces.encodedURL'] = initialUrl
+    urlParamsString = ""
+    for i in params:
+        urlParamsString += f'&{i}={urllib.parse.quote(params[i], safe="")}'
+
+    url = 'https://speclit.profy-lib.ru/book?' + urlParamsString[1::]
+    body['javax.faces.encodedURL'] = urllib.parse.quote(url, safe='()&?=')
+    bodyRow = ''
+    for i in body:
+        bodyRow += f'&{urllib.parse.quote(i, safe="()&?=")}={urllib.parse.quote(body[i], safe="()&?=")}'
+    resp = requests.post(url, headers=headers, data=bodyRow[1::])
+
+    reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", resp.text)
+    folderName = reg.group(1)
+    os.mkdir(folderName)  
+
+    return int(re.search(r"из (.*)<\/label>", resp.text).group(1))
+
+def downloadSpeclitProfylibImg():
+    global initialUrl
+    global folderName
+    bookNumber = 0
+
+    nextGuid = ''
+
+    body = json.load(open('body.json'))
+
+    pageCount = getMaxPageNumber() - 2
+    for i in range(pageCount):
+        clr()
+        print(f'Загрузка...')
+        print(i, " из ", pageCount)
+        cookies = json.load(open('cookies.json'))
+        headers = json.load(open('headers.json'))
+        params = json.load(open('query.json'))
+        cookiesString = ""
+        for i in cookies:
+            cookiesString += f'{i}={cookies[i]}; '
+        headers['Cookie'] = cookiesString
+        headers['Referer'] = initialUrl
+        
+        body['A9912:j_idt11:j_idt23'] = str(int(body['A9912:j_idt11:j_idt23']) + 1)
+        body['javax.faces.encodedURL'] = initialUrl
+        urlParamsString = ""
+        for i in params:
+            urlParamsString += f'&{i}={urllib.parse.quote(params[i], safe="")}'
+
+        url = 'https://speclit.profy-lib.ru/book?' + urlParamsString[1::]
+        body['javax.faces.encodedURL'] = urllib.parse.quote(url, safe='()&?=')
+        bodyRow = ''
+        for i in body:
+            bodyRow += f'&{urllib.parse.quote(i, safe="()&?=")}={urllib.parse.quote(body[i], safe="()&?=")}'
+        resp = requests.post(url, headers=headers, data=bodyRow[1::])
+
+        reg = re.search(r"id=\"A9912:j_idt146\" src=\".*documentId=(.*)&amp;layout=(.*)\" width", resp.text)
+        nextName = reg.group(1)
+        nexLayout = reg.group(2)
+        imgUrl = "https://speclit.profy-lib.ru/pdf-viewer-portlet/pdfRenderer/?documentId=" + urllib.parse.quote(nextName, safe='()') + "&layout=" + urllib.parse.quote(nexLayout, safe='()')
+
+        cookies['csfcfc'] = nextGuid
+        cookiesString = ""
+        for i in cookies:
+            cookiesString += f'{i}={cookies[i]}; '
+        headers['Cookie'] = cookiesString
+
+        headers['Accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        del headers['Content-type']
+        headers['Sec-Fetch-Dest'] = 'image'
+        headers['Sec-Fetch-Mode'] = 'no-cors'
+
+        res = requests.get(imgUrl, headers=headers, stream=True)
+        nextGuid = re.search(f"csfcfc=(.*);", resp.headers['Set-Cookie']).group(1)
+        if res.status_code == 200:
+            with open(f'{folderName}/{bookNumber}.jpg', 'wb') as f:
+                f.write(res.content)
+                bookNumber += 1
+
+
+def speclitProfylibInit():
+    global initialUrl
+    try:
+
+        downloadSpeclitProfylibImg()
+
+    except Exception as _ex:
+        print('Ошибка: ', url)
+        print(_ex)
+
+    initialUrl = ""
+
+    clr()
+    print('Загрузка завершена')
+    pass
 
 
 if __name__ == '__main__':
@@ -305,4 +430,6 @@ if __name__ == '__main__':
                 rosmedlibInit()
             elif 'www.studentlibrary.ru' in initialUrl:
                 studentlibraryInit()
+            elif 'speclit.profy-lib.ru' in initialUrl:
+                speclitProfylibInit()
 
